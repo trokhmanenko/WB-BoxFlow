@@ -15,10 +15,11 @@ def start_message(user_data):
     return msg
 
 
-def success_result_generation_message(new_limit):
-    msg = f"🎉 Поздравляем! После нескольких часов раскопок, в руки вашего героя попадает Грааль\n\n" \
-          f"Осталось попыток: {new_limit}"
-    return msg
+def success_message_for_wildberries(new_limit):
+    return f"🎉 Поздравляем! Этот файл можно загрузить на Wildberries.\nОсталось попыток: {new_limit}"
+
+def instruction_for_warehouse_message(new_limit):
+    return f"📦 А вот и инструкция для склада поспела!\nОсталось попыток: {new_limit}"
 
 
 def exceeded_limit_message(user_data):

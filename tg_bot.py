@@ -132,7 +132,7 @@ async def handle_generate_report(message: types.Message):
             box_capacity_df, items_to_ship_df, boxes_id_df = db.get_data_from_db(user_id)
 
             # Выполняем генерацию отчета
-            result, result_file_name = main.generate_report(box_capacity_df, items_to_ship_df, boxes_id_df)
+            result = main.generate_report(box_capacity_df, items_to_ship_df, boxes_id_df)
 
             if isinstance(result, str):
                 # Если функция вернула строку, значит произошла ошибка
@@ -141,8 +141,17 @@ async def handle_generate_report(message: types.Message):
                 if not user_data['is_authorized']:
                     new_limit = db.decrease_usage_limit(user_id)
                 db.create_generation(user_id)
-                await bot.send_document(user_id, InputFile(result, filename=result_file_name),
-                                        caption=msg.success_result_generation_message(new_limit))
+
+                result_wb, result_storage = result
+
+                # Отправка файла для Wildberries
+                await bot.send_document(user_id,
+                                        InputFile(result_wb[0], filename=result_wb[1]),
+                                        caption=msg.success_message_for_wildberries(new_limit))
+
+                # Отправка инструкции для склада
+                await bot.send_document(user_id, InputFile(result_storage[0], filename=result_storage[1]),
+                                        caption=msg.instruction_for_warehouse_message(new_limit))
     else:
         # Если пользователь не авторизован и у него нет попыток
         await message.answer(msg.exceeded_limit_message(user_data))

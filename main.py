@@ -43,7 +43,7 @@ def open_excel(bytes_file: bytes, header: int = 0) -> Optional[List[Dict[str, pd
 def is_box_capacity(df: pd.DataFrame, *args) -> Union[bool, str]:
     # Проверяем наличие необходимых столбцов
     df.columns = [col.lower() for col in df.columns]
-    required_columns = {'баркод', 'кратность'}
+    required_columns = {'артикул продавца', 'размер', 'баркод', 'кратность'}
     if len(df.columns) != len(required_columns) or set(df.columns) != required_columns:
         return False
     try:
@@ -101,9 +101,14 @@ def find_lcm_of_series(series):
 
 def pack_boxes(box_capacity_df, items_to_ship_df):
     # Переименовываем столбцы
-    box_capacity_df.columns = ['barcode', 'multiplicity']
+    box_capacity_df.columns = ['seller_art', 'size', 'barcode', 'multiplicity']
     items_to_ship_df.columns = ['barcode', 'quantity']
 
+    # преобразования столбцов к типу str
+    box_capacity_df['barcode'] = box_capacity_df['barcode'].astype(str)
+    items_to_ship_df['barcode'] = items_to_ship_df['barcode'].astype(str)
+
+    # Объединяем таблицы по 'barcode'
     merged_df = pd.merge(items_to_ship_df, box_capacity_df, on='barcode', how='left')
     if merged_df['multiplicity'].isna().any():
         return "Отсутствуют данные о кратности для одного или нескольких товаров"
@@ -136,11 +141,14 @@ def pack_boxes(box_capacity_df, items_to_ship_df):
             boxes.at[current_box_index, 'volume'] -= items_to_place * row['volume']
 
             # Добавляем информацию в result_df
-            result_row = {'barcode': row['barcode'],
-                          'quantity': items_to_place,
-                          'box_id': current_box_index,
-                          'expiration_date': '',
-                          }
+            result_row = {
+                'barcode': row['barcode'],
+                'quantity': items_to_place,
+                'box_id': current_box_index,
+                'expiration_date': '',
+                'seller_art': row['seller_art'],
+                'size': row['size']
+            }
             result_rows.append(result_row)
 
             # Переход к следующей коробке, если текущая заполнена
@@ -148,7 +156,7 @@ def pack_boxes(box_capacity_df, items_to_ship_df):
                 boxes.drop(current_box_index, inplace=True)
 
     # Создаем DataFrame из накопленных результатов
-    result_df = pd.DataFrame(result_rows, columns=['barcode', 'quantity', 'box_id', 'expiration_date'])
+    result_df = pd.DataFrame(result_rows)
 
     return result_df
 
@@ -264,38 +272,50 @@ def generate_report(box_capacity_df, items_to_ship_df, boxes_id_df):
     # Обновление box_id в packed_boxes с использованием словаря
     packed_boxes['box_id'] = packed_boxes['box_id'].map(box_id_to_name)
 
-    # Преобразование первых двух столбцов в целочисленный тип
-    packed_boxes['barcode'] = packed_boxes['barcode'].astype('int64')
-    packed_boxes['quantity'] = packed_boxes['quantity'].astype('int64')
+    # # Преобразование первых двух столбцов в целочисленный тип
+    # packed_boxes['barcode'] = packed_boxes['barcode'].astype(str)
+    # packed_boxes['quantity'] = packed_boxes['quantity'].astype('int64')
 
     packed_boxes = packed_boxes.rename(columns={'barcode': 'баркод товара',
                                                 'quantity': 'кол-во товаров',
                                                 'box_id': 'шк короба',
-                                                'expiration_date': 'срок годности'})
+                                                'expiration_date': 'срок годности',
+                                                'seller_art': 'Артикул продавца',
+                                                'size': 'Размер'})
 
+    df_1_cols = ['баркод товара', 'кол-во товаров', 'шк короба', 'срок годности']
+    df_2_cols = ['Артикул продавца', 'Размер'] + df_1_cols
+
+    df_1 = packed_boxes[df_1_cols]
+    df_2 = packed_boxes[df_2_cols]
+
+    # Сохранение первого файла
     current_date = datetime.now().strftime("%Y-%m-%d")
-    result_file_name = f'\\Раскладка коробок_{current_date}.xlsx'
+    result_file_name1 = f'\\Раскладка коробок_{current_date}.xlsx'
+    output1 = write_dfs_to_xlsx(df_1, 'Sheet1')
 
-    output = write_dfs_to_xlsx(packed_boxes)
+    # Создание и сохранение второго файла
+    result_file_name2 = f'\\Инструкция для склада_{current_date}.xlsx'
+    output2 = write_dfs_to_xlsx(df_2, 'Инструкция для склада')
 
-    wb = load_workbook(filename=output)
+    wb = load_workbook(filename=output2)
 
     apply_table_styles(
-        wb['Раскладка'], packed_boxes, 1, [30, 30, 30, 30],
-        table_border='thin', header_border='thick', wrap_text_header=True, header_alignment='left',
+        wb['Инструкция для склада'], df_2, 1, [20] * 6,
+        table_border='thin', header_border='thick', wrap_text_header=True,
         table_alignment=['left', 'right']
     )
-    output.seek(0)
-    wb.save(output)
-    output.seek(0)
+    output2.seek(0)
+    wb.save(output2)
+    output2.seek(0)
 
-    return output, result_file_name
+    return (output1, result_file_name1), (output2, result_file_name2)
 
 
-def write_dfs_to_xlsx(total: pd.DataFrame) -> io.BytesIO:
+def write_dfs_to_xlsx(total: pd.DataFrame, sheet_name) -> io.BytesIO:
     output = io.BytesIO()
 
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        total.to_excel(writer, sheet_name='Раскладка', index=False, header=True)
+        total.to_excel(writer, sheet_name=sheet_name, index=False, header=True)
     output.seek(0)
     return output
