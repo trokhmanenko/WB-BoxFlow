@@ -44,11 +44,11 @@ def is_box_capacity(df: pd.DataFrame, *args) -> Union[bool, str]:
     # Проверяем наличие необходимых столбцов
     df.columns = [col.lower() for col in df.columns]
     required_columns = {'артикул продавца', 'размер', 'баркод', 'кратность'}
-    if len(df.columns) != len(required_columns) or set(df.columns) != required_columns:
+    if not required_columns.issubset(set(df.columns)):
         return False
     try:
         # Пытаемся преобразовать 'Кратность' к числовому типу
-        df['Кратность'] = pd.to_numeric(df['Кратность'], errors='coerce')
+        df['кратность'] = pd.to_numeric(df['кратность'], errors='coerce')
 
         for col in required_columns:
             if df[col].isnull().any():
@@ -63,11 +63,11 @@ def is_box_capacity(df: pd.DataFrame, *args) -> Union[bool, str]:
 def is_items_to_ship(df: pd.DataFrame, *args) -> Union[bool, str]:
     df.columns = [col.lower() for col in df.columns]
     required_columns = {'баркод', 'количество'}
-    if len(df.columns) != len(required_columns) or set(df.columns) != required_columns:
+    if not required_columns.issubset(set(df.columns)):
         return False
     try:
         # Пытаемся преобразовать 'Количество' к числовому типу
-        df['Количество'] = pd.to_numeric(df['Количество'], errors='coerce')
+        df['количество'] = pd.to_numeric(df['количество'], errors='coerce')
 
         for col in required_columns:
             if df[col].isnull().any():
@@ -82,7 +82,7 @@ def is_items_to_ship(df: pd.DataFrame, *args) -> Union[bool, str]:
 def is_boxes_id(df: pd.DataFrame, user_data) -> Union[bool, str]:
     df.columns = [col.lower() for col in df.columns]
     required_columns = {'баркод товара', 'кол-во товаров', 'шк короба', 'срок годности'}
-    if len(df.columns) != len(required_columns) or set(df.columns) != required_columns:
+    if not required_columns.issubset(set(df.columns)):
         return False
     if df['шк короба'].nunique() != user_data["amount_of_boxes"]:
         return "Номера коробок не совпадают"
